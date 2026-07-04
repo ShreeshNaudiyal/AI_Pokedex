@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: pokedex-backend
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  cache:
+    cache-names: pokemonDetails
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=6h
+
+pokedex:
+  model:
+    path: classpath:models/pokedex_classifier.onnx
+    labels-path: classpath:labels.txt
+    input-size: 224
+    top-k: 3
+    confidence-threshold: 0.15
+  pokeapi:
+    base-url: https://pokeapi.co/api/v2
+
+logging:
+  level:
+    com.pokedex: DEBUG
+    ai.djl: INFO
