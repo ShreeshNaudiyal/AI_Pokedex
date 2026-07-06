@@ -39,3 +39,12 @@ FINE_TUNE_LEARNING_RATE = 1e-5
 # ---- Model ----
 BASE_MODEL_NAME = "MobileNetV2"   # "MobileNetV2" or "ResNet50"
 DROPOUT_RATE = 0.3
+
+
+# ---- Augmentation-based dataset synthesis (for 1-image-per-class datasets) ----
+NUMBER_TO_NAME_PATH = os.path.join(BASE_DIR, "data", "number_to_name.json")
+AUGMENTED_COPIES_PER_CLASS = 80   # synthetic images generated per Pokemon
+MIN_ROTATION_DEG = -15
+MAX_ROTATION_DEG = 15
+MIN_SCALE = 0.85
+MAX_SCALE = 1.15
