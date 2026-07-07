@@ -43,8 +43,12 @@ DROPOUT_RATE = 0.3
 
 # ---- Augmentation-based dataset synthesis (for 1-image-per-class datasets) ----
 NUMBER_TO_NAME_PATH = os.path.join(BASE_DIR, "data", "number_to_name.json")
-AUGMENTED_COPIES_PER_CLASS = 80   # synthetic images generated per Pokemon
+AUGMENTED_COPIES_PER_CLASS = 35   # reduced from 80 - still enough variety, ~2.3x faster
 MIN_ROTATION_DEG = -15
 MAX_ROTATION_DEG = 15
 MIN_SCALE = 0.85
 MAX_SCALE = 1.15
+
+# ---- Training (reduced for faster iteration) ----
+INITIAL_EPOCHS = 8            # was 15
+FINE_TUNE_EPOCHS = 6          # was 10
