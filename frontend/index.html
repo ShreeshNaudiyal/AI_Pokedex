@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Pokédex</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/pokedex-shell.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <div class="scene">
+        <div class="pokedex" id="pokedex">
+
+            <!-- ===== LEFT PANEL (Screen + Controls) ===== -->
+            <div class="panel panel-left">
+
+                <div class="top-lights">
+                    <div class="big-light">
+                        <div class="big-light-inner"></div>
+                    </div>
+                    <div class="small-light small-light-red"></div>
+                    <div class="small-light small-light-yellow"></div>
+                    <div class="small-light small-light-green"></div>
+                </div>
+
+                <div class="screen-bezel">
+                    <div class="screen" id="screen">
+
+                        <!-- Idle state -->
+                        <div class="screen-state" id="state-idle">
+                            <div class="scanlines"></div>
+                            <p class="idle-text">NO POKÉMON DETECTED</p>
+                            <p class="idle-subtext">Upload an image to scan</p>
+                        </div>
+
+                        <!-- Loading state -->
+                        <div class="screen-state hidden" id="state-loading">
+                            <div class="scanlines"></div>
+                            <div class="loader-ring"></div>
+                            <p class="loading-text" id="loading-text">SCANNING...</p>
+                        </div>
+
+                        <!-- Error state -->
+                        <div class="screen-state hidden" id="state-error">
+                            <div class="scanlines"></div>
+                            <p class="error-icon">⚠</p>
+                            <p class="error-text" id="error-text">Could not identify Pokémon.</p>
+                        </div>
+
+                        <!-- Result state -->
+                        <div class="screen-state hidden" id="state-result">
+                            <div class="scanlines"></div>
+                            <div class="result-header">
+                                <span id="result-id">#000</span>
+                                <span id="result-name">MISSINGNO</span>
+                            </div>
+                            <div class="result-sprite-wrap">
+                                <img id="result-sprite" src="" alt="Pokemon sprite">
+                            </div>
+                            <div class="result-types" id="result-types"></div>
+                            <div class="confidence-bar-wrap">
+                                <div class="confidence-label">
+                                    <span>CONFIDENCE</span>
+                                    <span id="confidence-value">0%</span>
+                                </div>
+                                <div class="confidence-bar-track">
+                                    <div class="confidence-bar-fill" id="confidence-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="control-row">
+                    <div class="dpad">
+                        <button class="dpad-btn dpad-up" aria-label="up"></button>
+                        <button class="dpad-btn dpad-down" aria-label="down"></button>
+                        <button class="dpad-btn dpad-left" aria-label="left"></button>
+                        <button class="dpad-btn dpad-right" aria-label="right"></button>
+                        <div class="dpad-center"></div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="round-btn round-btn-blue" id="btn-scan" title="Scan">SCAN</button>
+                        <button class="round-btn round-btn-gray" id="btn-reset" title="Reset">RESET</button>
+                    </div>
+                </div>
+
+                <div class="speaker-lines">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+
+            <!-- ===== HINGE ===== -->
+            <div class="hinge"></div>
+
+            <!-- ===== RIGHT PANEL (Details + Upload) ===== -->
+            <div class="panel panel-right">
+
+                <div class="upload-zone" id="upload-zone">
+                    <input type="file" id="file-input" accept="image/*" hidden>
+                    <div class="upload-zone-inner" id="upload-zone-inner">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <p class="upload-title">Drop image or click to upload</p>
+                        <p class="upload-subtitle">JPG, PNG — up to 10MB</p>
+                    </div>
+                    <img id="preview-image" class="preview-image hidden" alt="Preview">
+                </div>
+
+                <div class="details-panel" id="details-panel">
+                    <div class="details-empty" id="details-empty">
+                        <p>Pokémon details will appear here after scanning.</p>
+                    </div>
+
+                    <div class="details-content hidden" id="details-content">
+                        <h2 class="details-name" id="details-name">—</h2>
+                        <p class="details-flavor" id="details-flavor">—</p>
+
+                        <div class="details-grid">
+                            <div class="detail-box">
+                                <span class="detail-label">Height</span>
+                                <span class="detail-value" id="detail-height">—</span>
+                            </div>
+                            <div class="detail-box">
+                                <span class="detail-label">Weight</span>
+                                <span class="detail-value" id="detail-weight">—</span>
+                            </div>
+                            <div class="detail-box">
+                                <span class="detail-label">Abilities</span>
+                                <span class="detail-value" id="detail-abilities">—</span>
+                            </div>
+                        </div>
+
+                        <h3 class="stats-title">Base Stats</h3>
+                        <div class="stats-list" id="stats-list"></div>
+
+                        <div class="alt-matches" id="alt-matches">
+                            <h3 class="alt-matches-title">Other possible matches</h3>
+                            <div class="alt-matches-list" id="alt-matches-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
