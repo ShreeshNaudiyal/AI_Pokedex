@@ -47,7 +47,15 @@
     function init() {
         const { uploadZone, fileInput, btnScan, btnReset } = UI.el;
 
-        uploadZone.addEventListener("click", () => fileInput.click());
+        uploadZone.addEventListener("click", (e) => {
+            if (e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+
+        fileInput.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
 
         fileInput.addEventListener("change", (e) => {
             const file = e.target.files[0];

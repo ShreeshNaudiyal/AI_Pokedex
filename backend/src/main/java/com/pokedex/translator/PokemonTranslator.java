@@ -9,17 +9,19 @@ import ai.djl.translate.Batchifier;
 import ai.djl.translate.Translator;
 import ai.djl.translate.TranslatorContext;
 
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Converts an input Image into the normalized NDArray tensor the ONNX model
- * expects, and converts raw model output logits into ranked Classifications.
+ * expects, and converts raw model output probabilities into ranked Classifications.
  *
- * IMPORTANT: preprocessing here must exactly match ml-training/src/data_loader.py:
+ * Preprocessing:
  *   - resize to inputSize x inputSize
- *   - scale pixel values with (x - 127.5) / 127.5  -> range [-1, 1]
- *   - NHWC layout (batch, height, width, channel) since that's what
- *     tf2onnx exports from a Keras model by default
+ *   - scale pixel values with (x - 127.5) / 127.5 -> range [-1, 1]
+ *   - NHWC layout (1, height, width, 3)
  */
 public class PokemonTranslator implements Translator<Image, Classifications> {
 
@@ -33,33 +35,45 @@ public class PokemonTranslator implements Translator<Image, Classifications> {
 
     @Override
     public NDList processInput(TranslatorContext ctx, Image input) {
-        NDArray array = input.toNDArray(ctx.getNDManager(), Image.Flag.COLOR);
+        BufferedImage original = (BufferedImage) input.getWrappedImage();
+        BufferedImage resized = new BufferedImage(inputSize, inputSize, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = resized.createGraphics();
+        g.drawImage(original, 0, 0, inputSize, inputSize, null);
+        g.dispose();
 
-        // Resize to model's expected input dimensions
-        array = ai.djl.modality.cv.util.NDImageUtils.resize(array, inputSize, inputSize);
+        float[] data = new float[1 * inputSize * inputSize * 3];
+        int idx = 0;
+        for (int y = 0; y < inputSize; y++) {
+            for (int x = 0; x < inputSize; x++) {
+                int rgb = resized.getRGB(x, y);
+                float r = (rgb >> 16) & 0xFF;
+                float gr = (rgb >> 8) & 0xFF;
+                float b = rgb & 0xFF;
+                data[idx++] = (r - 127.5f) / 127.5f;
+                data[idx++] = (gr - 127.5f) / 127.5f;
+                data[idx++] = (b - 127.5f) / 127.5f;
+            }
+        }
 
-        // Cast to float32
-        array = array.toType(ai.djl.ndarray.types.DataType.FLOAT32, false);
-
-        // Normalize to [-1, 1]: (x - 127.5) / 127.5
-        array = array.sub(127.5f).div(127.5f);
-
-        // DJL's toNDArray returns HWC; add batch dim -> NHWC (1, H, W, C)
-        array = array.expandDims(0);
-
+        NDArray array = ctx.getNDManager().create(data, new Shape(1, inputSize, inputSize, 3));
         return new NDList(array);
     }
 
     @Override
     public Classifications processOutput(TranslatorContext ctx, NDList list) {
         NDArray probabilities = list.singletonOrThrow();
-        // Output is already softmax-activated (final Dense layer uses softmax)
-        return new Classifications(classes, probabilities);
+        float[] probs = probabilities.toFloatArray();
+
+        List<Double> probList = new ArrayList<>(probs.length);
+        for (float p : probs) {
+            probList.add((double) p);
+        }
+
+        return new Classifications(classes, probList);
     }
 
     @Override
     public Batchifier getBatchifier() {
-        // We handle batching manually (expandDims above), so no auto-batchifier
         return null;
     }
 }

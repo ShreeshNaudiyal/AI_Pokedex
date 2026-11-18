@@ -148,11 +148,12 @@ mvn spring-boot:run
 
 ## Frontend Setup
 
-Open the frontend folder using **VS Code Live Server** or any local server.
+The frontend is packaged into the Spring Boot backend and served automatically at:
+```
+http://localhost:8080/
+```
 
-```
-frontend/index.html
-```
+Alternatively, you can open `frontend/index.html` using **VS Code Live Server** or any static file server; the client automatically connects to the backend on `http://localhost:8080/api`.
 
 ---
 
@@ -170,29 +171,21 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Train the model:
-
-Linux / macOS
-
-```bash
-bash train.sh
-```
-
-Windows
+Train / export the full 721-class ONNX model:
 
 ```powershell
-python train.py
+python src/build_full_model.py
 ```
 
 ---
 
-# 🔌 REST API Endpoints
+## 🔌 REST API Endpoints
 
 | Method | Endpoint | Description |
 |---------|----------|-------------|
-| POST | `/predict` | Predict Pokémon from uploaded image |
-| GET | `/pokemon/{name}` | Fetch Pokémon details |
-| GET | `/health` | Health check |
+| POST | `/api/identify` | Predict Pokémon from uploaded image (`multipart/form-data`, key: `image`) |
+| GET | `/api/health` | Health check endpoint (returns `"OK"`) |
+| GET | `/` | Web interface (served directly by Spring Boot) |
 
 ---
 

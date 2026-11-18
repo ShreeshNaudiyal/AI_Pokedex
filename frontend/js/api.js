@@ -4,7 +4,8 @@
  */
 
 const API = (() => {
-    const BASE_URL = "http://localhost:8080/api";
+    const isSameOriginBackend = window.location.protocol.startsWith("http") && window.location.port === "8080";
+    const BASE_URL = isSameOriginBackend ? "/api" : "http://localhost:8080/api";
 
     /**
      * Uploads an image file and returns the parsed PokemonResponse JSON.

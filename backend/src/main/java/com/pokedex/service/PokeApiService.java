@@ -9,7 +9,6 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
@@ -24,9 +23,7 @@ public class PokeApiService {
     private final WebClient pokeApiWebClient;
 
     /**
-     * Maps a small set of known-inconsistent class label names (as produced
-     * by our training pipeline's normalize_name()) to the exact slug PokeAPI
-     * expects. Most names pass through unchanged.
+     * Maps known-inconsistent class label names to the exact slug PokeAPI expects.
      */
     private static final Map<String, String> NAME_OVERRIDES = Map.of(
             "nidoran-f", "nidoran-f",
@@ -37,7 +34,6 @@ public class PokeApiService {
             "type-null", "type-null",
             "ho-oh", "ho-oh",
             "jangmo-o", "jangmo-o"
-            // extend this map as you discover mismatches during testing
     );
 
     public PokeApiService(WebClient pokeApiWebClient) {
@@ -47,7 +43,10 @@ public class PokeApiService {
     @Cacheable(cacheNames = "pokemonDetails", key = "#predictedName")
     public PokemonResponse fetchDetails(String predictedName, double confidence,
                                           List<com.pokedex.model.PredictionResult.ClassProbability> alternatives) {
-        String apiSlug = NAME_OVERRIDES.getOrDefault(predictedName, predictedName);
+        String normalized = predictedName != null
+                ? predictedName.trim().toLowerCase().replaceAll("[^a-z0-9-]", "-")
+                : "pikachu";
+        String apiSlug = NAME_OVERRIDES.getOrDefault(normalized, normalized);
 
         JsonNode pokemonData = fetchPokemonNode(apiSlug);
         JsonNode speciesData = fetchSpeciesNode(apiSlug);
@@ -65,6 +64,9 @@ public class PokeApiService {
         } catch (WebClientResponseException.NotFound e) {
             log.error("PokeAPI: pokemon '{}' not found", slug);
             throw new PokemonNotFoundException("No PokeAPI entry for: " + slug);
+        } catch (Exception e) {
+            log.error("PokeAPI error while fetching pokemon '{}': {}", slug, e.getMessage());
+            throw new RuntimeException("Failed to fetch Pokemon details from PokeAPI: " + e.getMessage(), e);
         }
     }
 
@@ -75,8 +77,8 @@ public class PokeApiService {
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .block();
-        } catch (WebClientResponseException.NotFound e) {
-            log.warn("PokeAPI: species data not found for '{}', continuing without flavor text", slug);
+        } catch (Exception e) {
+            log.warn("PokeAPI: species data not found for '{}', continuing without flavor text: {}", slug, e.getMessage());
             return null;
         }
     }
@@ -84,21 +86,24 @@ public class PokeApiService {
     private PokemonResponse buildResponse(JsonNode pokemon, JsonNode species,
                                              double confidence,
                                              List<com.pokedex.model.PredictionResult.ClassProbability> alternatives) {
-        int id = pokemon.get("id").asInt();
-        String name = pokemon.get("name").asText();
+        int id = pokemon.path("id").asInt(0);
+        String name = pokemon.path("name").asText("unknown");
 
-        List<String> types = StreamSupport.stream(pokemon.get("types").spliterator(), false)
-                .map(t -> t.get("type").get("name").asText())
+        List<String> types = StreamSupport.stream(pokemon.path("types").spliterator(), false)
+                .map(t -> t.path("type").path("name").asText())
+                .filter(t -> !t.isEmpty())
                 .collect(Collectors.toList());
 
-        List<String> abilities = StreamSupport.stream(pokemon.get("abilities").spliterator(), false)
-                .map(a -> a.get("ability").get("name").asText())
+        List<String> abilities = StreamSupport.stream(pokemon.path("abilities").spliterator(), false)
+                .map(a -> a.path("ability").path("name").asText())
+                .filter(a -> !a.isEmpty())
                 .collect(Collectors.toList());
 
-        Map<String, Integer> statMap = StreamSupport.stream(pokemon.get("stats").spliterator(), false)
+        Map<String, Integer> statMap = StreamSupport.stream(pokemon.path("stats").spliterator(), false)
                 .collect(Collectors.toMap(
-                        s -> s.get("stat").get("name").asText(),
-                        s -> s.get("base_stat").asInt()
+                        s -> s.path("stat").path("name").asText(),
+                        s -> s.path("base_stat").asInt(0),
+                        (existing, replacement) -> existing
                 ));
 
         PokemonResponse.Stats stats = new PokemonResponse.Stats(
@@ -110,10 +115,23 @@ public class PokeApiService {
                 statMap.getOrDefault("speed", 0)
         );
 
-        double heightMeters = pokemon.get("height").asInt() / 10.0;  // API returns decimeters
-        double weightKg = pokemon.get("weight").asInt() / 10.0;      // API returns hectograms
+        double heightMeters = pokemon.path("height").asInt(0) / 10.0;  // API returns decimeters
+        double weightKg = pokemon.path("weight").asInt(0) / 10.0;      // API returns hectograms
 
-        String spriteUrl = pokemon.path("sprites").path("front_default").asText(null);
+        // Prefer high-resolution official artwork if present, otherwise front_default
+        String spriteUrl = null;
+        JsonNode sprites = pokemon.path("sprites");
+        if (!sprites.isMissingNode()) {
+            JsonNode officialArtwork = sprites.path("other").path("official-artwork").path("front_default");
+            if (!officialArtwork.isMissingNode() && !officialArtwork.isNull()) {
+                spriteUrl = officialArtwork.asText();
+            } else {
+                JsonNode frontDefault = sprites.path("front_default");
+                if (!frontDefault.isMissingNode() && !frontDefault.isNull()) {
+                    spriteUrl = frontDefault.asText();
+                }
+            }
+        }
 
         String flavorText = extractEnglishFlavorText(species);
 
@@ -128,8 +146,8 @@ public class PokeApiService {
             return "No description available.";
         }
         for (JsonNode entry : species.get("flavor_text_entries")) {
-            if (entry.get("language").get("name").asText().equals("en")) {
-                return entry.get("flavor_text").asText()
+            if ("en".equals(entry.path("language").path("name").asText())) {
+                return entry.path("flavor_text").asText()
                         .replaceAll("[\\n\\f\\r]", " ");
             }
         }

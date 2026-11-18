@@ -52,8 +52,7 @@ public class InferenceService {
                 throw new LowConfidencePredictionException(bestConfidence);
             }
 
-            List<PredictionResult.ClassProbability> topK = items.stream()
-                    .limit(modelProperties.topK())
+            List<PredictionResult.ClassProbability> topK = classifications.topK(modelProperties.topK()).stream()
                     .map(c -> new PredictionResult.ClassProbability(
                             c.getClassName(), c.getProbability()))
                     .collect(Collectors.toList());

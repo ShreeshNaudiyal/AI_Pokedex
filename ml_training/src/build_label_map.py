@@ -1,50 +1,57 @@
 """
-Maps Pokedex number (filename) -> Pokemon name, using PokeAPI.
-Since the Kaggle dataset names files "1.png", "2.png", etc., we need
-this mapping to build data/processed/<name>/ folders.
-
-Run: python -m src.build_label_map
+Maps Pokedex number / filename -> Pokemon name, using PokeAPI.
+Handles both numeric IDs (1.png -> bulbasaur) and form suffixes (115-mega.png -> kangaskhan).
 """
 
 import json
 import os
-import time
+import re
 import requests
 from src import config
 
 CACHE_PATH = os.path.join(config.BASE_DIR, "data", "number_to_name.json")
-POKEAPI_BASE = "https://pokeapi.co/api/v2/pokemon"
+POKEAPI_LIST = "https://pokeapi.co/api/v2/pokemon?limit=721"
 
 
-def build_map(max_id: int = 819):
+def build_map():
     if os.path.exists(CACHE_PATH):
         with open(CACHE_PATH) as f:
             mapping = json.load(f)
         print(f"[build_label_map] Loaded existing cache with {len(mapping)} entries.")
-    else:
-        mapping = {}
+        return mapping
 
-    for dex_id in range(1, max_id + 1):
-        if str(dex_id) in mapping:
-            continue
-        try:
-            resp = requests.get(f"{POKEAPI_BASE}/{dex_id}", timeout=10)
-            resp.raise_for_status()
-            name = resp.json()["name"]
-            mapping[str(dex_id)] = name
-            print(f"[build_label_map] {dex_id} -> {name}")
-        except requests.RequestException as e:
-            print(f"[build_label_map] WARNING: failed for id {dex_id}: {e}")
-        time.sleep(0.05)  # be polite to the public API
+    print("[build_label_map] Fetching Pokemon names from PokeAPI...")
+    try:
+        resp = requests.get(POKEAPI_LIST, timeout=20)
+        resp.raise_for_status()
+        results = resp.json()["results"]
+        base_map = {str(i + 1): item["name"] for i, item in enumerate(results)}
+    except requests.RequestException as e:
+        print(f"[build_label_map] Error fetching PokeAPI list: {e}")
+        base_map = {}
 
-        if dex_id % 50 == 0:
-            _save(mapping)
+    raw_dir = config.RAW_DATA_DIR
+    mapping = {}
+    if os.path.exists(raw_dir):
+        for fname in os.listdir(raw_dir):
+            if not fname.endswith(".png"):
+                continue
+            key = os.path.splitext(fname)[0]
+            m = re.match(r"^(\d+)", key)
+            if m:
+                base_id = m.group(1)
+                name = base_map.get(base_id, f"pokemon-{base_id}")
+                mapping[key] = name
+            else:
+                mapping[key] = key
 
     _save(mapping)
     print(f"[build_label_map] Done. {len(mapping)} entries saved to {CACHE_PATH}")
+    return mapping
 
 
 def _save(mapping):
+    os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
     with open(CACHE_PATH, "w") as f:
         json.dump(mapping, f, indent=2)
 

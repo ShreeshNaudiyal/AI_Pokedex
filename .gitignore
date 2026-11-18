@@ -1,1 +1,5 @@
 ml_training/data/raw/
+backend/target/
+*.log
+__pycache__/
+*.pyc

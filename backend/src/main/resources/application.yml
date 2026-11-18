@@ -19,7 +19,7 @@ pokedex:
     labels-path: classpath:labels.txt
     input-size: 224
     top-k: 3
-    confidence-threshold: 0.15
+    confidence-threshold: 0.01
   pokeapi:
     base-url: https://pokeapi.co/api/v2
 
